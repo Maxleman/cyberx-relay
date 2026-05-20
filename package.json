@@ -1,0 +1,12 @@
+{
+  "name": "cyberxgreen-relay",
+  "version": "1.0.0",
+  "description": "CyberXGreen QR Menu Relay Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
