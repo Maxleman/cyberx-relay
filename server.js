@@ -2,17 +2,10 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-// ═══════════════════════════════════════════════
-//  CyberXGreen Relay Server (Node.js)
-//  Принимает заказы из QR-меню,
-//  отдаёт локальному серверу клуба
-// ═══════════════════════════════════════════════
-
 const RELAY_SECRET = process.env.RELAY_SECRET || 'cyberxgreen_relay_2025';
 const PORT = process.env.PORT || 3000;
 const ORDERS_FILE = path.join(__dirname, 'orders.json');
 
-// ── Хранилище ──
 function readOrders() {
   try {
     if (!fs.existsSync(ORDERS_FILE)) return [];
@@ -28,13 +21,13 @@ function generateId() {
   return 'relay_' + Math.random().toString(36).substr(2, 10);
 }
 
-// ── HTTP сервер ──
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, `http://localhost`);
-  const action = url.searchParams.get('action');
-  const key = url.searchParams.get('key');
+  // Парсим URL правильно
+  const baseUrl = `http://localhost`;
+  const fullUrl = new URL(req.url, baseUrl);
+  const action = fullUrl.searchParams.get('action');
+  const key = fullUrl.searchParams.get('key');
 
-  // CORS
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -47,16 +40,19 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify(data, null, 2));
   };
 
-  // Читаем тело POST
   let body = '';
   req.on('data', chunk => body += chunk);
   req.on('end', () => {
     let parsed = {};
     try { parsed = body ? JSON.parse(body) : {}; } catch {}
 
+    // Если нет action — отвечаем ping по умолчанию
+    if (!action || action === 'ping') {
+      return respond({ success: true, message: 'CyberXGreen Relay is alive', time: new Date().toISOString() });
+    }
+
     switch (action) {
 
-      // ── Принять заказ от QR-меню ──
       case 'submit_order': {
         if (req.method !== 'POST') return respond({ error: 'POST required' }, 405);
         if (!parsed.items || !parsed.items.length) return respond({ error: 'Invalid order' }, 400);
@@ -81,14 +77,12 @@ const server = http.createServer((req, res) => {
         break;
       }
 
-      // ── Отдать pending заказы локальному серверу ──
       case 'fetch_pending': {
         if (key !== RELAY_SECRET) return respond({ error: 'Unauthorized' }, 403);
 
         const orders = readOrders();
         const pending = orders.filter(o => o.status === 'pending');
 
-        // Помечаем как fetched
         orders.forEach(o => {
           if (o.status === 'pending') {
             o.status = 'fetched';
@@ -102,7 +96,6 @@ const server = http.createServer((req, res) => {
         break;
       }
 
-      // ── Подтвердить обработку заказов ──
       case 'confirm': {
         if (key !== RELAY_SECRET) return respond({ error: 'Unauthorized' }, 403);
         if (req.method !== 'POST') return respond({ error: 'POST required' }, 405);
@@ -117,7 +110,6 @@ const server = http.createServer((req, res) => {
         break;
       }
 
-      // ── Статус (для отладки) ──
       case 'status': {
         if (key !== RELAY_SECRET) return respond({ error: 'Unauthorized' }, 403);
         const orders = readOrders();
@@ -131,11 +123,6 @@ const server = http.createServer((req, res) => {
         });
         break;
       }
-
-      // ── Ping ──
-      case 'ping':
-        respond({ success: true, message: 'CyberXGreen Relay is alive', time: new Date().toISOString() });
-        break;
 
       default:
         respond({ error: 'Unknown action' }, 404);
