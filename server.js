@@ -60,6 +60,8 @@ const server = http.createServer((req, res) => {
         const order = {
           id: generateId(),
           table_id: parsed.table_id || 'unknown',
+          payment_method: ['cash','card'].includes(parsed.payment_method) ? parsed.payment_method : 'cash',
+          given_cash: parsed.given_cash ?? null,
           items: parsed.items,
           total: parsed.total || 0,
           note: parsed.note || '',
