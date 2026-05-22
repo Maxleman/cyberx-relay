@@ -126,6 +126,30 @@ const server = http.createServer((req, res) => {
         break;
       }
 
+      // ── Сохранить QR меню (с локального сервера) ──
+      case 'save_menu': {
+        if (key !== RELAY_SECRET) return respond({ error: 'Unauthorized' }, 403);
+        if (req.method !== 'POST') return respond({ error: 'POST required' }, 405);
+        if (!parsed.products) return respond({ error: 'products required' }, 400);
+        const menuFile = path.join(__dirname, 'qr_menu.json');
+        fs.writeFileSync(menuFile, JSON.stringify({ products: parsed.products, updated_at: new Date().toISOString() }, null, 2));
+        console.log(`[MENU] Опубликовано ${parsed.products.length} товаров`);
+        respond({ success: true, count: parsed.products.length });
+        break;
+      }
+
+      // ── Получить QR меню (из QR-меню по HTTPS) ──
+      case 'get_menu': {
+        const menuFile = path.join(__dirname, 'qr_menu.json');
+        try {
+          const menu = JSON.parse(fs.readFileSync(menuFile, 'utf8'));
+          respond({ success: true, products: menu.products || [], updated_at: menu.updated_at });
+        } catch {
+          respond({ success: true, products: [] });
+        }
+        break;
+      }
+
       default:
         respond({ error: 'Unknown action' }, 404);
     }
